@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Data folders
+Datasets/**/Graphs/
+Datasets/**/PDBs/
+
+# Model checkpoints
+ckpts/
+
+# Logs
+logs/

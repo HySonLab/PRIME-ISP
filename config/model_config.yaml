@@ -1,0 +1,129 @@
+# =========================================
+# Data
+# =========================================
+data:
+  pdb_dir: ./data/pretrain_data/01-benchmark_pdbs
+  surface_dir: ./data/pretrain_data/01-benchmark_surfaces
+  batch_size: 32
+
+# =========================================
+# Atom Encoder
+# =========================================
+atom:
+  k: 8
+  atom_feat_dim: 7
+  hidden_dim: 256
+  latent_dim: 128
+  n_layers: 3
+  lr: 0.001
+  epochs: 50
+  save_path: ./ckpts/atom_egnn_encoder.pt
+  log_path: ./logs/training_log_atom_encoder.txt
+
+# =========================================
+# Surface Encoder
+# =========================================
+surface:
+  input_dim: 16
+  hidden_dim: 256
+  latent_dim: 128
+  n_layers: 3
+  lr: 0.001
+  max_faces: 1024
+  epochs: 50
+  save_path: ./ckpts/surface_emnn_encoder.pt
+  log_path: ./logs/training_log_surface_encoder.txt
+
+# =========================================
+# Hierarchical GNN
+# =========================================
+
+hierarchical:
+  hidden_dim: 128
+  n_layers: 3
+  dropout: 0.3
+
+  # =========================================
+  # WITH pretrained encoders (EGNN + EMNN)
+  # =========================================
+  # input_dims:
+  #   surface: 130    # EMNN output (128) + handcrafted (2)
+  #   atom: 128       # EGNN output
+  #   residue: 23     # one-hot + angles
+  #   sse: 4          # type one-hot (3) + length (1)
+  #   protein: 1280   # ESM-2 CLS token
+
+  # =========================================
+  # WITHOUT pretrained encoders (comment out above, uncomment below)
+  # =========================================
+  input_dims:
+      surface: 8
+      atom: 17
+      residue: 1318
+      sse: 4
+      protein: 1280
+
+# =========================================
+# Output Heads
+# =========================================
+
+head:
+  PPI-site_Train335-Test60-Test315:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  PPI-site_Train352-Test70:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  PPI-site_Train9982-Test355:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  PepPI-site_Train640-Test639:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  PepPI-site_Train1154-Test125:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  DPI-site:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  RPI-site:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  MPI-site_CA:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  MPI-site_FE:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  MPI-site_MN:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  CarbPI-site:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3
+
+  SMPI-site:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.3

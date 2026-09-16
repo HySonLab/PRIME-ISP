@@ -1,0 +1,151 @@
+tasks:
+
+  PPI-site_Train335-Test60-Test315:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/PPI-site/splits/train_split_Train_335.txt
+      test:
+        60:  ./Datasets/PPI-site/splits/test_split_Test_60.txt
+        315: ./Datasets/PPI-site/splits/test_split_Test_315.txt
+
+    graph_dir: ./Datasets/PPI-site/Graphs
+
+  PPI-site_Train352-Test70:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/PPI-site/splits/train_split_Train352.txt
+      test:
+        70: ./Datasets/PPI-site/splits/test_split_Test70.txt
+
+    graph_dir: ./Datasets/PPI-site/Graphs
+
+  PPI-site_Train9982-Test355:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/PPI-site/splits/train_split_Train9982.txt
+      test:
+        355: ./Datasets/PPI-site/splits/test_split_Test355.txt
+
+    graph_dir: ./Datasets/PPI-site/Graphs
+
+  PepPI-site_Train640-Test639:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/PepPI-site/splits/train_split_Pep_Train_640.txt
+      test:  ./Datasets/PepPI-site/splits/test_split_Pep_Test_639.txt
+
+    graph_dir: ./Datasets/PepPI-site/Graphs
+
+  PepPI-site_Train1154-Test125:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/PepPI-site/splits/train_split_Pep_Train_1154.txt
+      test:  ./Datasets/PepPI-site/splits/test_split_Pep_Test_125.txt
+
+    graph_dir: ./Datasets/PepPI-site/Graphs
+
+  DPI-site:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/DPI-site/splits/train_split_DNA-573_Train.txt
+      test:
+        129: ./Datasets/DPI-site/splits/test_split_DNA-129_Test.txt
+        181: ./Datasets/DPI-site/splits/test_split_DNA-181_Test.txt
+
+    graph_dir: ./Datasets/DPI-site/Graphs
+
+  RPI-site:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/RPI-site/splits/train_split_RNA-495_Train.txt
+      test:  ./Datasets/RPI-site/splits/test_split_RNA-117_Test.txt
+
+    graph_dir: ./Datasets/RPI-site/Graphs
+
+  MPI-site_CA:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    label_files:
+      - ./Datasets/MPI-site/CA-1670_Train.txt
+      - ./Datasets/MPI-site/CA-415_Test.txt
+
+    splits:
+      train: ./Datasets/MPI-site/splits/train_split_CA-1670_Train.txt
+      test:  ./Datasets/MPI-site/splits/test_split_CA-415_Test.txt
+
+    graph_dir: ./Datasets/MPI-site/Graphs
+
+  MPI-site_FE:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    label_files:
+      - ./Datasets/MPI-site/FE-278_Train.txt
+      - ./Datasets/MPI-site/FE-70_Test.txt
+
+    splits:
+      train: ./Datasets/MPI-site/splits/train_split_FE-278_Train.txt
+      test:  ./Datasets/MPI-site/splits/test_split_FE-70_Test.txt
+
+    graph_dir: ./Datasets/MPI-site/Graphs
+
+  MPI-site_MN:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    label_files:
+      - ./Datasets/MPI-site/MN-578_Train.txt
+      - ./Datasets/MPI-site/MN-144_Test.txt
+
+    splits:
+      train: ./Datasets/MPI-site/splits/train_split_MN-578_Train.txt
+      test:  ./Datasets/MPI-site/splits/test_split_MN-144_Test.txt
+
+    graph_dir: ./Datasets/MPI-site/Graphs
+
+  CarbPI-site:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/CarbPI-site/splits/train_split_Carb-Train517_Carb-Valid129.txt
+      test:  ./Datasets/CarbPI-site/splits/test_split_Carb-Test162.txt
+
+    graph_dir: ./Datasets/CarbPI-site/Graphs
+
+  SMPI-site:
+    task_type: node_classification
+    task_level: node
+    num_classes: 2
+
+    splits:
+      train: ./Datasets/SMPI-site/splits/train_split_SMPI-Train1628_SMPI-Valid348.txt
+      test:  ./Datasets/SMPI-site/splits/test_split_SMPI-Test348.txt
+
+    graph_dir: ./Datasets/SMPI-site/Graphs
