@@ -9,12 +9,12 @@
 # ---- Task ----
 # Which task's sequences to fold.
 # Options: PPI-site | PepPI-site | DPI-site | RPI-site | MPI-site | CarbPI-site | SMPI-site
-TASK="SMPI-site"
+TASK="PPI-site"
 
 TASK_DIR="./Datasets/${TASK}"
 
 # ---- GPU device ----
-CUDA_DEVICE=3
+CUDA_DEVICE=2
 
 echo "===================================="
 echo "ESMFold2 Structure Prediction"

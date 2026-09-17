@@ -9,6 +9,9 @@ __pycache__/
 Datasets/**/Graphs/
 Datasets/**/PDBs/
 
+# Visualization outputs
+visualizations/
+
 # Model checkpoints
 ckpts/
 

@@ -226,7 +226,7 @@ def main():
         model,
         sequences,
         outdir,
-        num_diffusion_samples=2,
+        num_diffusion_samples=8,
         max_length=None,
         failed_manifest_path=failed_manifest_path,
     )
