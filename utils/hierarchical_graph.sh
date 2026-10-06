@@ -10,8 +10,8 @@ CUDA_DEVICE=2
 # ---- Task ----
 
 # Which task to build graphs for.
-# Options: PPI-site | PepPI-site | DPI-site | RPI-site | MPI-site | CarbPI-site | SMPI-site
-TASK="SMPI-site"
+# Options: PPI-site | PepPI-site | DPI-site | RPI-site | MPI-site | CarbPI-site | SMPI-site | CaseStudies
+TASK="PPI-site"
 
 TASK_DIR="./Datasets/${TASK}"
 OUTPUT_DIR="./Datasets/${TASK}/Graphs"

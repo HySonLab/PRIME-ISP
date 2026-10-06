@@ -11,7 +11,6 @@ MODEL_NAME = "biohub/ESMFold2-hf"
 
 
 def parse_label_file(path):
-    """Parse '>header / sequence / 0101...labels' triplets into {id: sequence}."""
     sequences = {}
     with open(path) as f:
         lines = [l.rstrip("\n") for l in f if l.strip() != ""]
@@ -31,12 +30,6 @@ def parse_label_file(path):
 
 
 def collect_sequences(task_dir):
-    """Find every .txt / .fa raw label file anywhere under task_dir (including
-    nested subfolders for tasks with multiple train/test benchmark groups,
-    e.g. PPI-site/Train352-Test70/) and parse all id->sequence pairs from them.
-    Explicitly skips anything under a 'splits/' or 'PDBs/' directory, since
-    those hold derived split-id lists and folded structures, not raw label data.
-    """
     label_files = sorted(
         glob.glob(os.path.join(task_dir, "**", "*.txt"), recursive=True) +
         glob.glob(os.path.join(task_dir, "**", "*.fa"), recursive=True)
@@ -61,10 +54,6 @@ def collect_sequences(task_dir):
 
 
 def collect_split_ids(task_dir):
-    """Read every train_split_*.txt and test_split_*.txt under task_dir/splits/
-    and return the union of record ids across all of them -- this is the
-    authoritative list of exactly which proteins are actually needed for
-    folding, across every train/test sub-benchmark this task defines."""
     splits_dir = os.path.join(task_dir, "splits")
     split_files = sorted(
         glob.glob(os.path.join(splits_dir, "train_split_*.txt")) +
@@ -73,8 +62,7 @@ def collect_split_ids(task_dir):
 
     if not split_files:
         raise ValueError(
-            f"No train_split_*.txt / test_split_*.txt files found under "
-            f"{splits_dir} -- run make_splits.py for this task first."
+            f"No train_split_*.txt / test_split_*.txt files found under {splits_dir}"
         )
 
     print(f"Found {len(split_files)} split file(s) in {splits_dir}: "
@@ -196,13 +184,9 @@ def main():
     outdir = os.path.join(task_dir, "PDBs")
     failed_manifest_path = os.path.join(task_dir, "failed_sequences.csv")
 
-    # 1. Sequence source: recursively scan every raw label file under
-    #    task_dir (handles nested subfolders for multi-split tasks).
     all_sequences = collect_sequences(task_dir)
     print(f"Total sequences found in raw label files: {len(all_sequences)}")
-
-    # 2. Fold list: the authoritative set of ids actually needed, taken
-    #    from splits/train_split_*.txt + splits/test_split_*.txt.
+    
     needed_ids = collect_split_ids(task_dir)
 
     sequences = {}
@@ -226,7 +210,7 @@ def main():
         model,
         sequences,
         outdir,
-        num_diffusion_samples=8,
+        num_diffusion_samples=1,
         max_length=None,
         failed_manifest_path=failed_manifest_path,
     )

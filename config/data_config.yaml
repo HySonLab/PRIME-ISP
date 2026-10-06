@@ -6,10 +6,10 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/PPI-site/splits/train_split_Train_335.txt
+      train: ./Datasets/PPI-site/splits/train_split_PPI-Train335.txt
       test:
-        60:  ./Datasets/PPI-site/splits/test_split_Test_60.txt
-        315: ./Datasets/PPI-site/splits/test_split_Test_315.txt
+        60:  ./Datasets/PPI-site/splits/test_split_PPI-Test60.txt
+        315: ./Datasets/PPI-site/splits/test_split_PPI-Test315.txt
 
     graph_dir: ./Datasets/PPI-site/Graphs
 
@@ -19,9 +19,8 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/PPI-site/splits/train_split_Train352.txt
-      test:
-        70: ./Datasets/PPI-site/splits/test_split_Test70.txt
+      train: ./Datasets/PPI-site/splits/train_split_PPI-Train352.txt
+      test:  ./Datasets/PPI-site/splits/test_split_PPI-Test70.txt
 
     graph_dir: ./Datasets/PPI-site/Graphs
 
@@ -31,9 +30,8 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/PPI-site/splits/train_split_Train9982.txt
-      test:
-        355: ./Datasets/PPI-site/splits/test_split_Test355.txt
+      train: ./Datasets/PPI-site/splits/train_split_PPI-Train9982.txt
+      test:  ./Datasets/PPI-site/splits/test_split_PPI-Test355.txt
 
     graph_dir: ./Datasets/PPI-site/Graphs
 
@@ -43,8 +41,8 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/PepPI-site/splits/train_split_Pep_Train_640.txt
-      test:  ./Datasets/PepPI-site/splits/test_split_Pep_Test_639.txt
+      train: ./Datasets/PepPI-site/splits/train_split_PepPI-Train640.txt
+      test:  ./Datasets/PepPI-site/splits/test_split_PepPI-Test639.txt
 
     graph_dir: ./Datasets/PepPI-site/Graphs
 
@@ -54,8 +52,8 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/PepPI-site/splits/train_split_Pep_Train_1154.txt
-      test:  ./Datasets/PepPI-site/splits/test_split_Pep_Test_125.txt
+      train: ./Datasets/PepPI-site/splits/train_split_PepPI-Train1154.txt
+      test:  ./Datasets/PepPI-site/splits/test_split_PepPI-Test125.txt
 
     graph_dir: ./Datasets/PepPI-site/Graphs
 
@@ -65,10 +63,10 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/DPI-site/splits/train_split_DNA-573_Train.txt
+      train: ./Datasets/DPI-site/splits/train_split_DPI-Train573.txt
       test:
-        129: ./Datasets/DPI-site/splits/test_split_DNA-129_Test.txt
-        181: ./Datasets/DPI-site/splits/test_split_DNA-181_Test.txt
+        129: ./Datasets/DPI-site/splits/test_split_DPI-Test129.txt
+        181: ./Datasets/DPI-site/splits/test_split_DPI-Test181.txt
 
     graph_dir: ./Datasets/DPI-site/Graphs
 
@@ -78,8 +76,8 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/RPI-site/splits/train_split_RNA-495_Train.txt
-      test:  ./Datasets/RPI-site/splits/test_split_RNA-117_Test.txt
+      train: ./Datasets/RPI-site/splits/train_split_RPI-Train495.txt
+      test:  ./Datasets/RPI-site/splits/test_split_RPI-Test117.txt
 
     graph_dir: ./Datasets/RPI-site/Graphs
 
@@ -89,12 +87,12 @@ tasks:
     num_classes: 2
 
     label_files:
-      - ./Datasets/MPI-site/CA-1670_Train.txt
-      - ./Datasets/MPI-site/CA-415_Test.txt
+      - ./Datasets/MPI-site/CA-1670_Train.fa
+      - ./Datasets/MPI-site/CA-415_Test.fa
 
     splits:
-      train: ./Datasets/MPI-site/splits/train_split_CA-1670_Train.txt
-      test:  ./Datasets/MPI-site/splits/test_split_CA-415_Test.txt
+      train: ./Datasets/MPI-site/splits/train_split_MPI-CA-Train1670.txt
+      test:  ./Datasets/MPI-site/splits/test_split_MPI-CA-Test415.txt
 
     graph_dir: ./Datasets/MPI-site/Graphs
 
@@ -104,12 +102,12 @@ tasks:
     num_classes: 2
 
     label_files:
-      - ./Datasets/MPI-site/FE-278_Train.txt
-      - ./Datasets/MPI-site/FE-70_Test.txt
+      - ./Datasets/MPI-site/FE-278_Train.fa
+      - ./Datasets/MPI-site/FE-70_Test.fa
 
     splits:
-      train: ./Datasets/MPI-site/splits/train_split_FE-278_Train.txt
-      test:  ./Datasets/MPI-site/splits/test_split_FE-70_Test.txt
+      train: ./Datasets/MPI-site/splits/train_split_MPI-FE-Train278.txt
+      test:  ./Datasets/MPI-site/splits/test_split_MPI-FE-Test70.txt
 
     graph_dir: ./Datasets/MPI-site/Graphs
 
@@ -119,12 +117,12 @@ tasks:
     num_classes: 2
 
     label_files:
-      - ./Datasets/MPI-site/MN-578_Train.txt
-      - ./Datasets/MPI-site/MN-144_Test.txt
+      - ./Datasets/MPI-site/MN-578_Train.fa
+      - ./Datasets/MPI-site/MN-144_Test.fa
 
     splits:
-      train: ./Datasets/MPI-site/splits/train_split_MN-578_Train.txt
-      test:  ./Datasets/MPI-site/splits/test_split_MN-144_Test.txt
+      train: ./Datasets/MPI-site/splits/train_split_MPI-MN-Train578.txt
+      test:  ./Datasets/MPI-site/splits/test_split_MPI-MN-Test144.txt
 
     graph_dir: ./Datasets/MPI-site/Graphs
 
@@ -134,8 +132,8 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/CarbPI-site/splits/train_split_Carb-Train517_Carb-Valid129.txt
-      test:  ./Datasets/CarbPI-site/splits/test_split_Carb-Test162.txt
+      train: ./Datasets/CarbPI-site/splits/train_split_CarbPI-Train517-Valid129.txt
+      test:  ./Datasets/CarbPI-site/splits/test_split_CarbPI-Test162.txt
 
     graph_dir: ./Datasets/CarbPI-site/Graphs
 
@@ -145,7 +143,7 @@ tasks:
     num_classes: 2
 
     splits:
-      train: ./Datasets/SMPI-site/splits/train_split_SMPI-Train1628_SMPI-Valid348.txt
+      train: ./Datasets/SMPI-site/splits/train_split_SMPI-Train1628-Valid348.txt
       test:  ./Datasets/SMPI-site/splits/test_split_SMPI-Test348.txt
 
     graph_dir: ./Datasets/SMPI-site/Graphs

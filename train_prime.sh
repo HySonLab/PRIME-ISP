@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==========================================
-# PRIME Training Script
+# PRIME-ISP Training Script
 # ==========================================
 
 # -----------------------------
@@ -11,7 +11,7 @@
 #          PPI-site_Train9982-Test355 | PepPI-site_Train640-Test639 |
 #          PepPI-site_Train1154-Test125 | DPI-site | RPI-site |
 #          MPI-site_CA | MPI-site_FE | MPI-site_MN | CarbPI-site | SMPI-site
-TASK="SMPI-site"
+TASK="PPI-site_Train352-Test70"
 
 # -----------------------------
 # Config
@@ -45,7 +45,13 @@ DEVICE_ID=2
 # Hierarchy
 # -----------------------------
 ACTIVE_LEVELS=("surface" "atom" "residue" "sse" "protein")
-READOUT_LEVEL="residue"   # residue level for all *PI-site tasks
+READOUT_LEVEL="residue"
+
+# -----------------------------
+# Message-passing direction (bottom-up/top-down ablation)
+# -----------------------------
+# Options: bidirectional (default, full model) | bottom_up_only | top_down_only
+DIRECTION="bidirectional"
 
 # -----------------------------
 # Early stopping / LR schedule
@@ -78,6 +84,7 @@ echo "Augment eps:     $AUGMENT_EPS"
 echo "GPU:             $DEVICE_ID"
 echo "Active Levels:   ${ACTIVE_LEVELS[@]}"
 echo "Readout Level:   $READOUT_LEVEL"
+echo "Direction:       $DIRECTION"
 echo "Patience (ES):   $PATIENCE_ES"
 echo "Patience (LR):   $PATIENCE_LR"
 echo "K-folds:         $K_FOLDS"
@@ -98,6 +105,7 @@ CMD="python train_prime.py \
     --augment_eps $AUGMENT_EPS \
     --active_levels ${ACTIVE_LEVELS[@]} \
     --readout_level $READOUT_LEVEL \
+    --direction $DIRECTION \
     --patience_es $PATIENCE_ES \
     --patience_lr $PATIENCE_LR \
     --k_folds $K_FOLDS \
@@ -107,7 +115,13 @@ CMD="python train_prime.py \
 if [ "$RESUME" == "true" ] && [ "$K_FOLDS" -le 1 ]; then
     LEVEL_TAG="${ACTIVE_LEVELS[*]}"
     LEVEL_TAG="${LEVEL_TAG// /_}"
-    RESUME_PATH="./ckpts/best_prime_${TASK}_${LEVEL_TAG}_seed${SEED}.pt"
+
+    DIRECTION_TAG=""
+    if [ "$DIRECTION" != "bidirectional" ]; then
+        DIRECTION_TAG="_${DIRECTION}"
+    fi
+
+    RESUME_PATH="./ckpts/best_prime_${TASK}_${LEVEL_TAG}${DIRECTION_TAG}_seed${SEED}.pt"
 
     if [ -f "$RESUME_PATH" ]; then
         echo "Resuming from: $RESUME_PATH"

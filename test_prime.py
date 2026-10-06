@@ -39,7 +39,7 @@ def test_model(models, loader, device, threshold=0.5):
     """
     for m in models:
         m.eval()
-
+        
     auroc_metric = BinaryAUROC().to(device)
 
     f1_metric          = BinaryF1Score(threshold=threshold).to(device)
@@ -72,8 +72,8 @@ def test_model(models, loader, device, threshold=0.5):
                 probs  = torch.softmax(logits, dim=-1)[:, 1]
                 all_probs.append(probs)
             probs = torch.stack(all_probs, dim=0).mean(dim=0)
-            auroc_metric.update(probs.cpu(), labels.cpu())
 
+            auroc_metric.update(probs.cpu(), labels.cpu())
             f1_metric.update(probs, labels)
             mcc_metric.update(probs, labels)
             precision_metric.update(probs, labels)
@@ -127,9 +127,9 @@ def build_model(model_config, args, num_classes):
 
 
 if __name__ == "__main__":
-
+ 
     parser = argparse.ArgumentParser()
-
+ 
     parser.add_argument("--task", type=str, required=True,
                          help="Task name matching a key under 'tasks:' in data_config.yaml "
                               "and under 'head:' in model_config.yaml "
@@ -153,6 +153,16 @@ if __name__ == "__main__":
         default=["surface", "atom", "residue", "sse", "protein"]
     )
     parser.add_argument("--readout_level", type=str, default="residue")
+    parser.add_argument(
+        "--direction",
+        type=str,
+        default="bidirectional",
+        choices=["bidirectional", "bottom_up_only", "top_down_only"],
+        help="Message passing direction in the hierarchical encoder. Must "
+             "match the --direction the checkpoint was trained with "
+             "(bidirectional=default, no suffix in ckpt name). Used for "
+             "the bottom-up/top-down ablation study.",
+    )
     parser.add_argument("--test_name", type=str, default=None,
                         help="If the task's 'splits.test' in data_config.yaml is a dict of "
                              "named test sets (e.g. {129: ..., 181: ...}), select which one "
@@ -160,27 +170,27 @@ if __name__ == "__main__":
     parser.add_argument("--test_split", type=str, default=None,
                         help="Explicit path to a test split file, overriding whatever "
                              "'splits.test' resolves to in data_config.yaml entirely.")
-
+ 
     args   = parser.parse_args()
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+ 
     # --------------------------------------------------
     # Load configs
     # --------------------------------------------------
     data_config  = load_config(args.data_config)
     model_config = load_config(args.model_config)
-
+ 
     task_cfg    = data_config["tasks"][args.task]
     num_classes = task_cfg["num_classes"]
     graph_dir   = task_cfg["graph_dir"]
-
+ 
     label_positions = None
     if "label_files" in task_cfg:
         label_positions = load_ion_positions(task_cfg["label_files"])
         print(f"Loaded on-the-fly label positions for {len(label_positions)} "
               f"record(s) from {task_cfg['label_files']}")
-
+ 
     # --------------------------------------------------
     # Resolve test split (named / explicit / single-path)
     # --------------------------------------------------
@@ -188,7 +198,7 @@ if __name__ == "__main__":
         test_split = args.test_split
     else:
         test_cfg = task_cfg["splits"]["test"]
-
+ 
         if isinstance(test_cfg, dict):
             if args.test_name is None:
                 raise ValueError(
@@ -206,17 +216,18 @@ if __name__ == "__main__":
             test_split = test_cfg_str_keys[str(args.test_name)]
         else:
             test_split = test_cfg
-
+ 
     # --------------------------------------------------
     # Resolve checkpoint(s)
     # --------------------------------------------------
-    level_tag = "_".join(args.active_levels)
-    seed_tag  = f"seed{args.seed}"
-
+    level_tag     = "_".join(args.active_levels)
+    seed_tag      = f"seed{args.seed}"
+    direction_tag = f"_{args.direction}" if args.direction != "bidirectional" else ""
+ 
     ckpt_paths = []
     if args.k_folds > 1:
         for fold_idx in range(args.k_folds):
-            fold_ckpt = f"./ckpts/best_prime_{args.task}_{level_tag}_{seed_tag}_fold{fold_idx}.pt"
+            fold_ckpt = f"./ckpts/best_prime_{args.task}_{level_tag}{direction_tag}_{seed_tag}_fold{fold_idx}.pt"
             if not os.path.exists(fold_ckpt):
                 raise ValueError(f"Fold checkpoint not found: {fold_ckpt}")
             ckpt_paths.append(fold_ckpt)
@@ -227,22 +238,23 @@ if __name__ == "__main__":
         if args.ckpt_path is not None:
             ckpt_path = args.ckpt_path
         else:
-            ckpt_path = f"./ckpts/best_prime_{args.task}_{level_tag}_{seed_tag}.pt"
+            ckpt_path = f"./ckpts/best_prime_{args.task}_{level_tag}{direction_tag}_{seed_tag}.pt"
         if not os.path.exists(ckpt_path):
             raise ValueError(f"Checkpoint not found: {ckpt_path}")
         ckpt_paths = [ckpt_path]
-
+ 
     print("=" * 50)
     print(f"Task:          {args.task}")
     print(f"Test split:    {test_split}"
           + (f" (name: {args.test_name})" if args.test_name else ""))
     print(f"Active levels: {args.active_levels}")
     print(f"Readout level: {args.readout_level}")
+    print(f"Direction:     {args.direction}")
     print(f"Seed:          {args.seed}")
     print(f"K-folds:       {args.k_folds}")
     print(f"Checkpoint(s): {ckpt_paths}")
     print("=" * 50)
-
+ 
     # --------------------------------------------------
     # DataLoader
     # --------------------------------------------------
@@ -254,7 +266,7 @@ if __name__ == "__main__":
         test_only=True,
         label_positions=label_positions,
     )
-
+ 
     # --------------------------------------------------
     # Model(s)
     # --------------------------------------------------
@@ -264,7 +276,7 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(ckpt_path, map_location=device))
         model.to(device).eval()
         models.append(model)
-
+ 
     # --------------------------------------------------
     # Test
     # --------------------------------------------------

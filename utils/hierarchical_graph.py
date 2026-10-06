@@ -1145,10 +1145,6 @@ if __name__ == "__main__":
     records = collect_records(args.task_dir)
     print(f"Total records: {len(records)}")
 
-    # PDBs live in different places depending on format: triplet-format
-    # tasks (Protein/Peptide/DNA/RNA) use PDBs/{record_id}.pdb (from
-    # folding.py); site-format tasks (Metal) ship real structures under
-    # PDBs/receptor/{record_id}.pdb.
     pdb_dir_flat     = os.path.join(args.task_dir, "PDBs")
     pdb_dir_receptor = os.path.join(args.task_dir, "PDBs", "receptor")
 

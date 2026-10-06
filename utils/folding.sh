@@ -3,8 +3,6 @@
 # ==========================================
 # ESMFold2 Structure Prediction Script
 # ==========================================
-# Requires make_splits.py to have already been run for this task -- folding.py
-# reads Datasets/{TASK}/splits/*.txt to determine which sequences to fold.
 
 # ---- Task ----
 # Which task's sequences to fold.

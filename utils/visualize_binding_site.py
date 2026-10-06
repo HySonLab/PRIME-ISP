@@ -1,35 +1,8 @@
-"""
-visualize_binding_site.py
-
-Self-contained: given a task name, loads the trained (k-fold ensemble)
-PRIME-ISP model, picks one or more test proteins (random sample or a given
-record id), runs prediction, classifies each residue as TP/TN/FP/FN against
-the true labels, and renders a surface visualization colored accordingly --
-matching the style of Figure 2b in the ALLSites paper.
-
-Two rendering backends:
-  --backend matplotlib (default) -- pure Python, marching cubes on a Gaussian
-      atomic-density field, no external tools required.
-  --backend pymol -- higher-quality ray-traced rendering via the PyMOL Python
-      API, used automatically if available and requested; requires PyMOL
-      installed separately (e.g. `conda install -c conda-forge pymol-open-source`).
-
-Usage:
-    # random sample from the test set
-    python visualize_binding_site.py --task DPI-site --n_samples 1
-
-    # a specific protein
-    python visualize_binding_site.py --task DPI-site --record_id 5dv7_C
-
-    # with PyMOL rendering, if installed
-    python visualize_binding_site.py --task DPI-site --record_id 5dv7_C --backend pymol
-"""
-
 import argparse
+import json
 import os
 import sys
 import random
-import json
 import numpy as np
 import torch
 
@@ -141,22 +114,30 @@ def predict_one(models, graph, device, threshold, label_positions=None, record_i
 
 
 def classify_residues(true_labels, pred_labels, residue_id):
-    """Returns {resnum: 'TP'|'TN'|'FP'|'FN'} using residue_id ('chain:resnum')."""
+    """Returns {'chain:resnum': 'TP'|'TN'|'FP'|'FN'}, keyed by the FULL
+    residue_id string, not resnum alone. resnum-only keys silently collide
+    whenever a target has multiple chains with overlapping auth_seq_id
+    ranges (e.g. case-study targets like thrombin's heavy+light chains) --
+    two different residues would share one dict entry, and PyMOL's
+    unqualified `resi N` selector would then color BOTH chains' residue N
+    identically. Chain-qualifying is a no-op for single-chain tasks, so
+    this is safe for every existing (non-case-study) task too."""
     classification = {}
     for rid, t, p in zip(residue_id, true_labels, pred_labels):
-        try:
-            resnum = int(rid.split(":")[1])
-        except (IndexError, ValueError):
-            continue
         if t == 1 and p == 1:
-            classification[resnum] = "TP"
+            classification[rid] = "TP"
         elif t == 0 and p == 0:
-            classification[resnum] = "TN"
+            classification[rid] = "TN"
         elif t == 0 and p == 1:
-            classification[resnum] = "FP"
+            classification[rid] = "FP"
         else:
-            classification[resnum] = "FN"
+            classification[rid] = "FN"
     return classification
+
+
+def _parse_chain_resnum(rid):
+    chain_id, resnum = rid.split(":")
+    return chain_id, int(resnum)
 
 
 def compute_metrics(true_labels, pred_labels):
@@ -166,10 +147,12 @@ def compute_metrics(true_labels, pred_labels):
     fn = int(np.sum((pred_labels == 0) & (true_labels == 1)))
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (2 * precision * recall / (precision + recall)
+          if (precision + recall) > 0 else 0.0)
     denom = np.sqrt(float(tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
     mcc = (tp * tn - fp * fn) / denom if denom > 0 else 0.0
     return {"tp": tp, "tn": tn, "fp": fp, "fn": fn,
-            "precision": precision, "recall": recall, "mcc": mcc}
+            "precision": precision, "recall": recall, "f1": f1, "mcc": mcc}
 
 
 def find_pdb_path(task_dir, record_id):
@@ -183,6 +166,45 @@ def find_pdb_path(task_dir, record_id):
 
 
 # ======================================================
+# Best/worst-case scan (by MCC)
+# ======================================================
+
+def scan_best_worst(models, test_ids, graph_dir, device, threshold, label_positions):
+    """Scans every test protein, returns (best_id, best_metrics, worst_id,
+    worst_metrics). Skips proteins with zero positive residues (MCC
+    undefined) or missing graph files."""
+    results = []
+    for record_id in test_ids:
+        graph_path = os.path.join(graph_dir, f"{record_id}.pt")
+        if not os.path.exists(graph_path):
+            continue
+        try:
+            graph = torch.load(graph_path, map_location=device, weights_only=False)
+            true_labels, pred_labels, _ = predict_one(
+                models, graph, device, threshold, label_positions, record_id
+            )
+            if true_labels.sum() == 0:
+                continue
+            metrics = compute_metrics(true_labels, pred_labels)
+            results.append((record_id, metrics))
+        except Exception as e:
+            print(f"[WARN] skipped {record_id}: {e}")
+
+    if not results:
+        raise ValueError("No valid test proteins found to score.")
+
+    results.sort(key=lambda r: r[1]["mcc"])
+    worst_id, worst_metrics = results[0]
+    best_id, best_metrics = results[-1]
+
+    print(f"\nScanned {len(results)} test protein(s).")
+    print(f"  Worst case: {worst_id}  MCC={worst_metrics['mcc']:.3f}")
+    print(f"  Best case:  {best_id}  MCC={best_metrics['mcc']:.3f}")
+
+    return best_id, best_metrics, worst_id, worst_metrics
+
+
+# ======================================================
 # Backend 1: pure Python (marching cubes + matplotlib)
 # ======================================================
 
@@ -192,7 +214,7 @@ def load_atoms(pdb_path, chain_id=None):
     structure = parser.get_structure("protein", pdb_path)
     model = structure[0]
 
-    coords, elements, res_nums = [], [], []
+    coords, elements, res_keys = [], [], []
     for chain in model:
         if chain_id is not None and chain.id != chain_id:
             continue
@@ -205,8 +227,11 @@ def load_atoms(pdb_path, chain_id=None):
                     continue
                 coords.append(atom.get_coord())
                 elements.append(elem)
-                res_nums.append(res.id[1])
-    return np.array(coords, dtype=np.float32), elements, np.array(res_nums)
+                # chain-qualified, e.g. "H:20" -- matches classify_residues'
+                # keys and avoids resnum collisions across a target's own
+                # multiple chains (e.g. thrombin H/L overlapping numbering).
+                res_keys.append(f"{chain.id}:{res.id[1]}")
+    return np.array(coords, dtype=np.float32), elements, np.array(res_keys)
 
 
 def build_density_surface(coords, elements, grid_spacing=0.7, padding=4.0, iso_level=0.55):
@@ -241,25 +266,25 @@ def build_density_surface(coords, elements, grid_spacing=0.7, padding=4.0, iso_l
     return verts, faces
 
 
-def color_faces_by_residue(verts, faces, res_coords, res_nums, res_class):
+def color_faces_by_residue(verts, faces, res_coords, res_keys, res_class):
     from scipy.spatial import cKDTree
     tree = cKDTree(res_coords)
     face_centroids = verts[faces].mean(axis=1)
     _, nearest_idx = tree.query(face_centroids)
-    nearest_resnum = res_nums[nearest_idx]
-    return [COLORS[res_class.get(int(r), "TN")] for r in nearest_resnum]
+    nearest_key = res_keys[nearest_idx]
+    return [COLORS[res_class.get(k, "TN")] for k in nearest_key]
 
 
 def render_matplotlib(pdb_path, chain, res_class, output_prefix, grid_spacing=0.7):
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-    coords, elements, res_nums_per_atom = load_atoms(pdb_path, chain)
-    unique_resnums = np.unique(res_nums_per_atom)
-    res_coords = np.array([coords[res_nums_per_atom == r].mean(axis=0) for r in unique_resnums])
+    coords, elements, res_keys_per_atom = load_atoms(pdb_path, chain)
+    unique_keys = np.unique(res_keys_per_atom)
+    res_coords = np.array([coords[res_keys_per_atom == k].mean(axis=0) for k in unique_keys])
 
     verts, faces = build_density_surface(coords, elements, grid_spacing=grid_spacing)
-    face_colors = color_faces_by_residue(verts, faces, res_coords, unique_resnums, res_class)
+    face_colors = color_faces_by_residue(verts, faces, res_coords, unique_keys, res_class)
 
     for azim, suffix in [(-60, "front"), (120, "back")]:
         fig = plt.figure(figsize=(6, 6))
@@ -282,7 +307,8 @@ def render_matplotlib(pdb_path, chain, res_class, output_prefix, grid_spacing=0.
 # Backend 2: PyMOL (optional, higher quality)
 # ======================================================
 
-def render_pymol(pdb_path, chain, res_class, output_prefix, zoom_buffer=8):
+def render_pymol(pdb_path, chain, res_class, output_prefix, zoom_buffer=8,
+                  zoom_mode="whole"):
     try:
         import pymol2
     except ImportError:
@@ -303,24 +329,116 @@ def render_pymol(pdb_path, chain, res_class, output_prefix, zoom_buffer=8):
         cmd.set("ray_opaque_background", 0)
         cmd.color("gray80", "all")
 
-        for resnum, label in res_class.items():
+        # res_class is keyed by full "chain:resnum" residue_id -- always
+        # color WITH a chain qualifier, since an unqualified `resi N` hits
+        # every chain's residue N at once. For single-chain targets this is
+        # a no-op filter; for multi-chain targets (e.g. thrombin H/L, whose
+        # auth_seq_id ranges overlap) it's the difference between coloring
+        # the right residue and silently coloring the wrong one too.
+        for rid, label in res_class.items():
+            chain_id, resnum = _parse_chain_resnum(rid)
             r, g, b = COLORS_PYMOL[label]
-            color_name = f"col_{label}_{resnum}"
+            color_name = f"col_{label}_{chain_id}_{resnum}"
             cmd.set_color(color_name, [r, g, b])
-            cmd.color(color_name, f"resi {resnum}")
+            cmd.color(color_name, f"chain {chain_id} and resi {resnum}")
 
+        # Residues actually classified TP/FP/FN -- the "interesting" site,
+        # as opposed to background TN. When the site is small relative to
+        # the whole structure (e.g. a 3-5 residue metal-binding site on an
+        # otherwise large protein), zooming to "all" leaves it a
+        # barely-visible speck; zoom_mode="site" frames tightly on just
+        # this region instead. Framing for every other task is unchanged
+        # unless you explicitly pass --zoom_mode site for it too.
+        site_rids = [rid for rid, label in res_class.items() if label != "TN"]
+        use_site_zoom = (zoom_mode == "site" and len(site_rids) > 0)
+        if zoom_mode == "site" and not site_rids:
+            print("  Note: --zoom_mode site requested but no TP/FP/FN "
+                  "residues were classified -- falling back to the "
+                  "whole-structure zoom.")
+        site_sel = None
+        if site_rids:
+            by_chain = {}
+            for rid in site_rids:
+                c, r = _parse_chain_resnum(rid)
+                by_chain.setdefault(c, []).append(str(r))
+            site_sel = " or ".join(
+                f"(chain {c} and resi {'+'.join(rs)})" for c, rs in by_chain.items()
+            )
+
+        # Orient on the WHOLE structure even in site mode. cmd.orient() on
+        # a tiny, tightly clustered selection (3-5 residues around one
+        # metal ion) computes a degenerate PCA basis -- near-zero extent
+        # along one axis -- and the camera distance PyMOL derives from
+        # that ends up placing the camera essentially inside the surface
+        # mesh (black cave-wall artifacts, nothing recognizable). Orienting
+        # on the whole complex keeps a stable, sane camera direction; only
+        # the ZOOM target (site vs. whole) needs to differ.
         cmd.orient()
-        cmd.zoom("all", buffer=zoom_buffer)
+        if use_site_zoom:
+            # A concave binding pocket's actual surface can bulge closer to
+            # the camera than the atom-center buffer accounts for, so site
+            # zoom needs extra clearance beyond the buffer value used for
+            # whole-structure shots to avoid grazing/clipping into the wall.
+            site_zoom_buffer = max(zoom_buffer, 14)
+            cmd.zoom(site_sel, buffer=site_zoom_buffer)
+        else:
+            cmd.zoom("all", buffer=zoom_buffer)
         cmd.ray(1200, 1200)
         cmd.png(f"{output_prefix}_front.png", dpi=300)
         print(f"Saved: {output_prefix}_front.png")
 
         cmd.turn("y", 180)
-        cmd.zoom("all", buffer=zoom_buffer)
+        if use_site_zoom:
+            cmd.zoom(site_sel, buffer=site_zoom_buffer)
+        else:
+            cmd.zoom("all", buffer=zoom_buffer)
         cmd.ray(1200, 1200)
         cmd.png(f"{output_prefix}_back.png", dpi=300)
         print(f"Saved: {output_prefix}_back.png")
 
+
+# ======================================================
+# Visualize one protein end-to-end
+# ======================================================
+
+def visualize_one(models, record_id, graph_dir, task_dir, device, threshold,
+                    label_positions, chain, backend, grid_spacing, zoom_buffer,
+                    output_prefix, zoom_mode="whole"):
+    graph_path = os.path.join(graph_dir, f"{record_id}.pt")
+    graph = torch.load(graph_path, map_location=device, weights_only=False)
+
+    true_labels, pred_labels, residue_id = predict_one(
+        models, graph, device, threshold, label_positions, record_id
+    )
+    metrics = compute_metrics(true_labels, pred_labels)
+    print(f"{record_id}: F1={metrics['f1']:.3f}  Precision={metrics['precision']:.3f}  "
+          f"Recall={metrics['recall']:.3f}  MCC={metrics['mcc']:.3f}")
+
+    # Export this specific rendered case's own metrics as JSON, alongside
+    # the _front.png/_back.png -- make_qual_figure.py reads this to caption
+    # the panel with the metrics of the actual protein pictured, instead
+    # of the whole-test-set aggregate PRIME-ISP score from the main
+    # results table (those two numbers can differ quite a bit, since the
+    # pictured case is usually hand-picked as the best- or worst-scoring
+    # one, not a "typical" protein).
+    metrics_path = f"{output_prefix}_metrics.json"
+    with open(metrics_path, "w") as f:
+        json.dump({"record_id": record_id, **metrics}, f, indent=2)
+    print(f"Saved: {metrics_path}")
+
+    res_class = classify_residues(true_labels, pred_labels, residue_id)
+    pdb_path = find_pdb_path(task_dir, record_id)
+
+    if backend == "pymol":
+        render_pymol(pdb_path, chain, res_class, output_prefix, zoom_buffer, zoom_mode)
+    else:
+        if zoom_mode == "site":
+            print("  Note: --zoom_mode site is only implemented for the "
+                  "pymol backend; the matplotlib backend always frames the "
+                  "whole structure. Use --backend pymol for a tight zoom.")
+        render_matplotlib(pdb_path, chain, res_class, output_prefix, grid_spacing)
+
+    return metrics
 
 # ======================================================
 # Main
@@ -332,9 +450,9 @@ if __name__ == "__main__":
     parser.add_argument("--data_config", type=str, default="config/data_config.yaml")
     parser.add_argument("--model_config", type=str, default="config/model_config.yaml")
     parser.add_argument("--record_id", type=str, default=None,
-                         help="Specific protein to visualize. If omitted, samples "
-                              "--n_samples random proteins from the test split.")
-    parser.add_argument("--n_samples", type=int, default=1)
+                         help="Visualize one specific protein instead of best/worst.")
+    parser.add_argument("--n_samples", type=int, default=None,
+                         help="Visualize N random proteins instead of best/worst.")
     parser.add_argument("--test_name", type=str, default=None,
                          help="For tasks with multiple named test sets.")
     parser.add_argument("--seed", type=int, default=1)
@@ -344,7 +462,14 @@ if __name__ == "__main__":
     parser.add_argument("--backend", choices=["matplotlib", "pymol"], default="matplotlib")
     parser.add_argument("--zoom_buffer", type=float, default=8,
                          help="PyMOL backend only: extra margin (Angstrom) "
-                              "around the structure so nothing gets cropped.")
+                              "around the structure/site so nothing gets cropped.")
+    parser.add_argument("--zoom_mode", choices=["whole", "site"], default="whole",
+                         help="PyMOL backend only. 'whole' (default) zooms to fit the "
+                              "entire structure -- unchanged framing, same as before. "
+                              "'site' zooms tight on just the TP/FP/FN residues instead; "
+                              "use this for tasks where the binding site is small "
+                              "relative to the whole protein (e.g. MPI-Ca/Fe/Mn), where "
+                              "a whole-structure zoom makes the site nearly invisible.")
     parser.add_argument("--grid_spacing", type=float, default=0.7)
     parser.add_argument(
         "--active_levels", nargs="+",
@@ -352,6 +477,15 @@ if __name__ == "__main__":
     )
     parser.add_argument("--readout_level", type=str, default="residue")
     parser.add_argument("--output_dir", type=str, default="./outputs/viz")
+    parser.add_argument("--graph_dir", type=str, default=None,
+                         help="Override the task-config-derived graph directory "
+                              "(e.g. for case-study record_ids saved by "
+                              "run_case_study_inference.py). Defaults to "
+                              "data_config.yaml's tasks.<task>.graph_dir.")
+    parser.add_argument("--task_dir", type=str, default=None,
+                         help="Override the task-config-derived task directory "
+                              "(PDBs are read from <task_dir>/PDBs). Defaults to "
+                              "the parent of tasks.<task>.graph_dir.")
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -362,8 +496,9 @@ if __name__ == "__main__":
     model_config = load_config(args.model_config)
     task_cfg = data_config["tasks"][args.task]
     num_classes = task_cfg["num_classes"]
-    graph_dir = task_cfg["graph_dir"]
-    task_dir = os.path.dirname(graph_dir)  # assumes graph_dir = {task_dir}/Graphs
+    graph_dir = args.graph_dir if args.graph_dir else task_cfg["graph_dir"]
+    task_dir = args.task_dir if args.task_dir else os.path.dirname(task_cfg["graph_dir"])
+    # assumes graph_dir = {task_dir}/Graphs when not overridden
 
     label_positions = None
     if "label_files" in task_cfg:
@@ -371,38 +506,56 @@ if __name__ == "__main__":
 
     test_cfg = task_cfg["splits"]["test"]
     if isinstance(test_cfg, dict):
-        test_split = test_cfg[args.test_name] if args.test_name else list(test_cfg.values())[0]
+        test_cfg_str_keys = {str(k): v for k, v in test_cfg.items()}
+        if args.test_name:
+            if str(args.test_name) not in test_cfg_str_keys:
+                raise ValueError(
+                    f"--test_name '{args.test_name}' not found for task "
+                    f"'{args.task}'. Available: {list(test_cfg.keys())}"
+                )
+            test_split = test_cfg_str_keys[str(args.test_name)]
+        else:
+            test_split = list(test_cfg_str_keys.values())[0]
     else:
         test_split = test_cfg
+
     with open(test_split) as f:
         test_ids = [line.strip() for line in f if line.strip()]
-
-    if args.record_id:
-        chosen_ids = [args.record_id]
-    else:
-        chosen_ids = random.sample(test_ids, min(args.n_samples, len(test_ids)))
-    print(f"Visualizing: {chosen_ids}")
 
     models = load_ensemble(args.task, model_config, num_classes, args.active_levels,
                             args.readout_level, device, args.k_folds, args.seed)
 
-    for record_id in chosen_ids:
-        print(f"\n{'='*40}\n{record_id}\n{'='*40}")
-        graph_path = os.path.join(graph_dir, f"{record_id}.pt")
-        graph = torch.load(graph_path, map_location=device, weights_only=False)
+    if args.record_id:
+        # ---- specific protein ----
+        output_prefix = os.path.join(args.output_dir, args.record_id)
+        visualize_one(models, args.record_id, graph_dir, task_dir, device, args.threshold,
+                       label_positions, args.chain, args.backend, args.grid_spacing,
+                       args.zoom_buffer, output_prefix, args.zoom_mode)
 
-        true_labels, pred_labels, residue_id = predict_one(
-            models, graph, device, args.threshold, label_positions, record_id
+    elif args.n_samples:
+        # ---- random sample ----
+        chosen_ids = random.sample(test_ids, min(args.n_samples, len(test_ids)))
+        print(f"Visualizing {len(chosen_ids)} random sample(s): {chosen_ids}")
+        for record_id in chosen_ids:
+            output_prefix = os.path.join(args.output_dir, record_id)
+            visualize_one(models, record_id, graph_dir, task_dir, device, args.threshold,
+                           label_positions, args.chain, args.backend, args.grid_spacing,
+                           args.zoom_buffer, output_prefix, args.zoom_mode)
+
+    else:
+        # ---- default: find + render best/worst MCC case automatically ----
+        best_id, best_metrics, worst_id, worst_metrics = scan_best_worst(
+            models, test_ids, graph_dir, device, args.threshold, label_positions
         )
-        metrics = compute_metrics(true_labels, pred_labels)
-        print(f"Precision={metrics['precision']:.3f}  Recall={metrics['recall']:.3f}  "
-              f"MCC={metrics['mcc']:.3f}")
 
-        res_class = classify_residues(true_labels, pred_labels, residue_id)
-        pdb_path = find_pdb_path(task_dir, record_id)
-        output_prefix = os.path.join(args.output_dir, record_id)
+        print(f"\nRendering best case: {best_id}")
+        best_prefix = os.path.join(args.output_dir, "best")
+        visualize_one(models, best_id, graph_dir, task_dir, device, args.threshold,
+                       label_positions, args.chain, args.backend, args.grid_spacing,
+                       args.zoom_buffer, best_prefix, args.zoom_mode)
 
-        if args.backend == "pymol":
-            render_pymol(pdb_path, args.chain, res_class, output_prefix, args.zoom_buffer)
-        else:
-            render_matplotlib(pdb_path, args.chain, res_class, output_prefix, args.grid_spacing)
+        print(f"\nRendering worst case: {worst_id}")
+        worst_prefix = os.path.join(args.output_dir, "worst")
+        visualize_one(models, worst_id, graph_dir, task_dir, device, args.threshold,
+                       label_positions, args.chain, args.backend, args.grid_spacing,
+                       args.zoom_buffer, worst_prefix, args.zoom_mode)

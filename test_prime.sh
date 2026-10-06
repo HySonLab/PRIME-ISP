@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==========================================
-# PRIME Testing Script
+# PRIME-ISP Testing Script
 # ==========================================
 
 DATA_CONFIG="./config/data_config.yaml"
@@ -12,7 +12,7 @@ MODEL_CONFIG="./config/model_config.yaml"
 #          PPI-site_Train9982-Test355 | PepPI-site_Train640-Test639 |
 #          PepPI-site_Train1154-Test125 | DPI-site | RPI-site |
 #          MPI-site_CA | MPI-site_FE | MPI-site_MN | CarbPI-site | SMPI-site
-TASK="CarbPI-site"
+TASK="PPI-site_Train352-Test70"
 
 # ---- Test set name (only needed if the task has multiple named test sets) ----
 # PPI-site_Train335-Test60-Test315: 60 | 315
@@ -27,17 +27,31 @@ TEST_NAME=""
 K_FOLDS=5
 
 BATCH_SIZE=32
-CUDA_DEVICE=3
+CUDA_DEVICE=2
 SEED=1
 THRESHOLD=0.5
+
+# ACTIVE_LEVELS=("surface" "atom" "residue" "sse" "protein")
 
 ACTIVE_LEVELS=("surface" "atom" "residue" "sse" "protein")
 READOUT_LEVEL="residue"
 
+# ---- Message-passing direction (bottom-up/top-down ablation) ----
+# Must match whatever DIRECTION was used to train the checkpoint you're
+# testing. Options: bidirectional (default, full model) | bottom_up_only |
+# top_down_only
+DIRECTION="bidirectional"
+
 # ---- Auto-resolve checkpoint from training (single-checkpoint mode only) ----
 LEVEL_TAG="${ACTIVE_LEVELS[*]}"
 LEVEL_TAG="${LEVEL_TAG// /_}"
-CKPT_PATH="./ckpts/best_prime_${TASK}_${LEVEL_TAG}_seed${SEED}.pt"
+
+DIRECTION_TAG=""
+if [ "$DIRECTION" != "bidirectional" ]; then
+    DIRECTION_TAG="_${DIRECTION}"
+fi
+
+CKPT_PATH="./ckpts/best_prime_${TASK}_${LEVEL_TAG}${DIRECTION_TAG}_seed${SEED}.pt"
 
 echo "===================================="
 echo "Testing PRIME"
@@ -46,6 +60,7 @@ if [ -n "$TEST_NAME" ]; then
     echo "Test name:     $TEST_NAME"
 fi
 echo "K-folds:       $K_FOLDS"
+echo "Direction:     $DIRECTION"
 echo "CUDA device:   $CUDA_DEVICE"
 echo "Seed:          $SEED"
 echo "Threshold:     $THRESHOLD"
@@ -70,7 +85,8 @@ CMD="python test_prime.py \
     --threshold $THRESHOLD \
     --k_folds $K_FOLDS \
     --active_levels ${ACTIVE_LEVELS[@]} \
-    --readout_level $READOUT_LEVEL"
+    --readout_level $READOUT_LEVEL \
+    --direction $DIRECTION"
 
 if [ "$K_FOLDS" -le 1 ]; then
     CMD="$CMD --ckpt_path \"$CKPT_PATH\""

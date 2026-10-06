@@ -85,7 +85,6 @@ def train_one_epoch(
 
     return total_loss / len(loader), f1_metric.compute().item(), auprc_metric.compute().item()
 
-
 # ======================================================
 # Evaluate
 # ======================================================
@@ -250,7 +249,6 @@ def train_prime(
 
     return best_score
 
-
 # ======================================================
 # K-fold split (in-memory, fixed seed, no files touched
 # outside a temp dir -- make_splits.py is untouched)
@@ -343,6 +341,15 @@ if __name__ == "__main__":
                          help="If > 1, run k-fold cross-validation over the training "
                               "split instead of a single train/val run. Test set (if "
                               "used later via test_prime.py) is untouched either way.")
+    parser.add_argument(
+        "--direction",
+        type=str,
+        default="bidirectional",
+        choices=["bidirectional", "bottom_up_only", "top_down_only"],
+        help="Message passing direction in the hierarchical encoder "
+             "(bidirectional=default, no suffix in ckpt/log name). Used "
+             "for the bottom-up/top-down ablation study.",
+    )
 
     args   = parser.parse_args()
     set_seed(args.seed)
@@ -377,10 +384,12 @@ if __name__ == "__main__":
             head_layers=model_config["head"][args.task]["num_layers"],
             dropout=model_config["head"][args.task]["dropout"],
             task_level="node",
+            direction=args.direction,
         ).to(device)
 
-    level_tag = "_".join(args.active_levels)
-    seed_tag  = f"seed{args.seed}"
+    level_tag     = "_".join(args.active_levels)
+    seed_tag      = f"seed{args.seed}"
+    direction_tag = f"_{args.direction}" if args.direction != "bidirectional" else ""
     os.makedirs("./ckpts", exist_ok=True)
     os.makedirs("./logs",  exist_ok=True)
 
@@ -389,6 +398,7 @@ if __name__ == "__main__":
     print(f"Num classes:   {num_classes}")
     print(f"Readout level: {args.readout_level}")
     print(f"Active levels: {args.active_levels}")
+    print(f"Direction:     {args.direction}")
     print(f"Seed:          {args.seed}")
     print(f"K-folds:       {args.k_folds}")
     print(f"Patience (ES): {args.patience_es}")
@@ -421,8 +431,8 @@ if __name__ == "__main__":
             model.load_state_dict(torch.load(args.resume, map_location=device))
             print(f"Resumed from: {args.resume}")
 
-        output_path = f"./ckpts/best_prime_{args.task}_{level_tag}_{seed_tag}.pt"
-        log_path    = f"./logs/training_log_prime_{args.task}_{level_tag}_{seed_tag}.txt"
+        output_path = f"./ckpts/best_prime_{args.task}_{level_tag}{direction_tag}_{seed_tag}.pt"
+        log_path    = f"./logs/training_log_prime_{args.task}_{level_tag}{direction_tag}_{seed_tag}.txt"
 
         train_prime(
             model=model, train_loader=train_loader, val_loader=val_loader,
@@ -437,8 +447,6 @@ if __name__ == "__main__":
     else:
         # ---------------------------------------------
         # K-fold cross-validation over the training split.
-        # Folds are generated in-memory with a fixed seed --
-        # make_splits.py and the on-disk split files are untouched.
         # ---------------------------------------------
         splits = make_kfold_splits(train_split, k=args.k_folds, seed=args.seed)
         print(f"Generated {len(splits)} fold(s) from {train_split} "
@@ -469,8 +477,8 @@ if __name__ == "__main__":
 
                 model = build_model()
 
-                fold_output_path = f"./ckpts/best_prime_{args.task}_{level_tag}_{seed_tag}_fold{fold_idx}.pt"
-                fold_log_path    = f"./logs/training_log_prime_{args.task}_{level_tag}_{seed_tag}_fold{fold_idx}.txt"
+                fold_output_path = f"./ckpts/best_prime_{args.task}_{level_tag}{direction_tag}_{seed_tag}_fold{fold_idx}.pt"
+                fold_log_path    = f"./logs/training_log_prime_{args.task}_{level_tag}{direction_tag}_{seed_tag}_fold{fold_idx}.txt"
 
                 best_val_auprc = train_prime(
                     model=model, train_loader=train_loader, val_loader=val_loader,
@@ -492,9 +500,10 @@ if __name__ == "__main__":
         print(f"  Mean Val AUPRC: {mean_auprc:.4f} +/- {std_auprc:.4f}")
         print(f"{'='*40}")
 
-        summary_path = f"./logs/kfold_summary_{args.task}_{level_tag}_{seed_tag}.txt"
+        summary_path = f"./logs/kfold_summary_{args.task}_{level_tag}{direction_tag}_{seed_tag}.txt"
         with open(summary_path, "w") as f:
             f.write(f"Task: {args.task}\n")
+            f.write(f"Direction: {args.direction}\n")
             f.write(f"K-folds: {args.k_folds}, seed: {args.seed}\n")
             f.write(f"Model selection metric: Val AUPRC\n")
             f.write(f"Per-fold Val AUPRC: {fold_scores}\n")

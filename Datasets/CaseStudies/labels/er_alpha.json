@@ -1,0 +1,65 @@
+{
+  "SMPI_orthosteric": {
+    "source": "3L03 target chains ['A'] vs. ligand 4OH",
+    "note": "Estetrol bound in the orthosteric ligand-binding pocket.",
+    "cutoff_angstrom": 6.5,
+    "n_residues": 29,
+    "positions_by_chain": {
+      "A": [
+        343,
+        345,
+        346,
+        347,
+        349,
+        350,
+        353,
+        383,
+        384,
+        387,
+        388,
+        390,
+        391,
+        394,
+        403,
+        404,
+        420,
+        421,
+        424,
+        425,
+        428,
+        517,
+        520,
+        521,
+        522,
+        524,
+        525,
+        526,
+        528
+      ]
+    }
+  },
+  "PepPI_coactivator": {
+    "source": "3L03 target chains ['A'] vs. chain C",
+    "note": "GRIP1 NR-box II coactivator peptide bound at the AF-2 groove.",
+    "cutoff_angstrom": 5.0,
+    "n_residues": 14,
+    "positions_by_chain": {
+      "A": [
+        355,
+        358,
+        359,
+        362,
+        367,
+        372,
+        375,
+        376,
+        379,
+        380,
+        538,
+        539,
+        542,
+        543
+      ]
+    }
+  }
+}

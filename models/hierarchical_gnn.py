@@ -101,10 +101,14 @@ class GatedFusion(nn.Module):
         return self.norm(z + g * u)
     
 class HierarchicalLayer(nn.Module):
-    def __init__(self, dims, active_levels):
+    def __init__(self, dims, active_levels, direction="bidirectional"):
+        """
+        Args:
+            direction: "bidirectional" | "bottom_up_only" | "top_down_only"
+        """
         super().__init__()
-
         self.active_levels = active_levels
+        self.direction     = direction
 
         self.gnns = nn.ModuleDict({
             level: GraphBlock(
@@ -128,57 +132,61 @@ class HierarchicalLayer(nn.Module):
 
         for lower, upper, _ in transitions:
             if lower in active_levels and upper in active_levels:
-                self.proj_up[f"{lower}_{upper}"]   = nn.Linear(dims[lower], dims[upper])
-                self.fuse_up[upper]                 = GatedFusion(dims[upper])
-                self.proj_down[f"{upper}_{lower}"]  = nn.Linear(dims[upper], dims[lower])
-                self.fuse_down[lower]               = GatedFusion(dims[lower])
+                # only build needed modules based on direction
+                if direction in ("bidirectional", "bottom_up_only"):
+                    self.proj_up[f"{lower}_{upper}"] = nn.Linear(dims[lower], dims[upper])
+                    self.fuse_up[upper]               = GatedFusion(dims[upper])
+
+                if direction in ("bidirectional", "top_down_only"):
+                    self.proj_down[f"{upper}_{lower}"] = nn.Linear(dims[upper], dims[lower])
+                    self.fuse_down[lower]               = GatedFusion(dims[lower])
 
     def forward(self, graph, H):
-
         # ==================================================
         # 1. Intra-level GNN
         # ==================================================
         for level in self.active_levels:
-            A = getattr(graph, level).A
+            A        = getattr(graph, level).A
             H[level] = self.gnns[level](H[level], A)
 
         # ==================================================
-        # 2. Bottom-Up
+        # 2. Bottom-Up (skip if top_down_only)
         # ==================================================
-        transitions_up = [
-            ("surface", "atom",    "surface_to_atom_T"),
-            ("atom",    "residue", "atom_to_residue_T"),
-            ("residue", "sse",     "residue_to_sse_T"),
-            ("sse",     "protein", "sse_to_protein_T"),
-        ]
-
-        for lower, upper, partition_key in transitions_up:
-            if lower not in H or upper not in H:
-                continue
-            Pi_T = graph.partitions[partition_key]
-            msg  = sparse_mm_scatter(Pi_T, H[lower])
-            msg  = self.proj_up[f"{lower}_{upper}"](msg)
-            H[upper] = self.fuse_up[upper](H[upper], msg)
+        if self.direction in ("bidirectional", "bottom_up_only"):
+            transitions_up = [
+                ("surface", "atom",    "surface_to_atom_T"),
+                ("atom",    "residue", "atom_to_residue_T"),
+                ("residue", "sse",     "residue_to_sse_T"),
+                ("sse",     "protein", "sse_to_protein_T"),
+            ]
+            for lower, upper, partition_key in transitions_up:
+                if lower not in H or upper not in H:
+                    continue
+                Pi_T     = graph.partitions[partition_key]
+                msg      = sparse_mm_scatter(Pi_T, H[lower])
+                msg      = self.proj_up[f"{lower}_{upper}"](msg)
+                H[upper] = self.fuse_up[upper](H[upper], msg)
 
         # ==================================================
-        # 3. Top-Down
+        # 3. Top-Down (skip if bottom_up_only)
         # ==================================================
-        transitions_down = [
-            ("sse",     "protein", "sse_to_protein"),
-            ("residue", "sse",     "residue_to_sse"),
-            ("atom",    "residue", "atom_to_residue"),
-            ("surface", "atom",    "surface_to_atom"),
-        ]
-
-        for lower, upper, partition_key in transitions_down:
-            if lower not in H or upper not in H:
-                continue
-            Pi   = graph.partitions[partition_key]
-            msg  = sparse_mm_scatter(Pi, H[upper])
-            msg  = self.proj_down[f"{upper}_{lower}"](msg)
-            H[lower] = self.fuse_down[lower](H[lower], msg)
+        if self.direction in ("bidirectional", "top_down_only"):
+            transitions_down = [
+                ("sse",     "protein", "sse_to_protein"),
+                ("residue", "sse",     "residue_to_sse"),
+                ("atom",    "residue", "atom_to_residue"),
+                ("surface", "atom",    "surface_to_atom"),
+            ]
+            for lower, upper, partition_key in transitions_down:
+                if lower not in H or upper not in H:
+                    continue
+                Pi       = graph.partitions[partition_key]
+                msg      = sparse_mm_scatter(Pi, H[upper])
+                msg      = self.proj_down[f"{upper}_{lower}"](msg)
+                H[lower] = self.fuse_down[lower](H[lower], msg)
 
         return H
+
 
 class HierarchicalGNN(nn.Module):
     def __init__(
@@ -187,28 +195,35 @@ class HierarchicalGNN(nn.Module):
         active_levels,
         hidden_dim=128,
         n_layers=3,
-        dropout=0.1
+        dropout=0.1,
+        direction="bidirectional",
     ):
+        """
+        Args:
+            direction: "bidirectional"   — full bottom-up + top-down (default)
+                       "bottom_up_only"  — only bottom-up aggregation
+                       "top_down_only"   — only top-down propagation
+        """
         super().__init__()
-
         self.active_levels = active_levels
+        self.direction     = direction
+
+        assert direction in ("bidirectional", "bottom_up_only", "top_down_only"), \
+            f"Unknown direction: {direction}"
 
         self.input_proj = nn.ModuleDict({
             level: nn.Linear(input_dims[level], hidden_dim)
             for level in active_levels
         })
-
         self.input_norm = nn.ModuleDict({
             level: nn.LayerNorm(hidden_dim)
             for level in active_levels
         })
-
         self.dropout = nn.Dropout(dropout)
 
         dims = {level: hidden_dim for level in active_levels}
-
         self.layers = nn.ModuleList([
-            HierarchicalLayer(dims, active_levels)
+            HierarchicalLayer(dims, active_levels, direction=direction)
             for _ in range(n_layers)
         ])
 
@@ -220,16 +235,16 @@ class HierarchicalGNN(nn.Module):
     def forward(self, graph):
         H = {}
         for level in self.active_levels:
-            x = getattr(graph, level).X
-            x = self.input_proj[level](x)
-            x = self.input_norm[level](x)
-            x = torch.relu(x)
-            x = self.dropout(x)
+            x        = getattr(graph, level).X
+            x        = self.input_proj[level](x)
+            x        = self.input_norm[level](x)
+            x        = torch.relu(x)
+            x        = self.dropout(x)
             H[level] = x
 
         for layer in self.layers:
             H_new = layer(graph, H)
-            H = {level: H[level] + H_new[level] for level in H}
+            H     = {level: H[level] + H_new[level] for level in H}
 
         for level in H:
             H[level] = self.final_norm[level](H[level])
