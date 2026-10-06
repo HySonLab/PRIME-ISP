@@ -22,11 +22,11 @@ pip install -r requirements.txt \
 
 ## Data Preparation
 
-All benchmark sequences, labels, and split files are in this repository under `Datasets/`. The predicted structures (ESMFold2) and the trained model checkpoints are archived on Zenodo: https://doi.org/10.5281/zenodo.XXXXXXX
+All benchmark sequences, labels, and split files are in this repository under `Datasets/`. The predicted structures (ESMFold2) and the trained model checkpoints are archived on Zenodo: https://doi.org/10.5281/zenodo.23198572
 
 Download the archive and extract it so that predicted PDB files sit at `Datasets/<TASK>/PDBs/` and checkpoints at `ckpts/`. If you want to regenerate the structures yourself, set `TASK` in `utils/folding.sh` and run it.
 
-Next, build the hierarchical graphs from the predicted structures. Open `hierarchical_graph.sh`, set `TASK` to the benchmark family you want to prepare (`PPI-site`, `PepPI-site`, `DPI-site`, `RPI-site`, `MPI-site`, `CarbPI-site`, `SMPI-site`, or `CaseStudies`), then run:
+Next, build the hierarchical graphs from the predicted structures. Open `hierarchical_graph.sh`, set `TASK` to the benchmark family you want to prepare (`PPI-site`, `PepPI-site`, `DPI-site`, `RPI-site`, `MPI-site`, `CarbPI-site`, or `SMPI-site`), then run:
 
 ```bash
 bash hierarchical_graph.sh
@@ -54,7 +54,7 @@ PRIME-ISP/
 └── test_prime.py  / test_prime.sh
 ```
 
-## Supported benchmarks
+## Supported Benchmarks
 
 Task names are the values passed to `--task` / `TASK=` in the scripts. Residue-level benchmarks follow the dataset partitions and annotation criteria of ALLSites (Mou et al.) and the original task-specific papers.
 
@@ -127,6 +127,62 @@ Each residue is colored as a true positive, true negative, false positive, or fa
 | `CHAIN` | Restrict the rendering to one chain (optional) |
 | `BACKEND` | `pymol` (default, requires PyMOL) or `matplotlib` |
 | `CUDA_DEVICE` | GPU index |
+
+## Case Studies
+
+`run_case_study_inference.py` runs the trained five-fold ensemble on a single protein, scores the residue predictions against known site annotations, and saves per-residue predictions that can be rendered on the structure. We use it for the thrombin, ERα, and calmodulin case studies in the paper, and the same script can be used to run your own protein.
+
+```bash
+python run_case_study_inference.py \
+    --pdb_dir      case_studies/pdbs \
+    --labels_dir   case_studies/labels \
+    --data_config  config/data_config.yaml \
+    --model_config config/model_config.yaml \
+    --graph_dir    case_studies/graphs \
+    --task_dir     case_studies/tasks \
+    --output_dir   case_studies/predictions \
+    --k_folds 5 --seed 1 --threshold 0.5
+```
+
+| Argument | Description |
+| --- | --- |
+| `--pdb_dir` | Directory containing one `{target}_clean.pdb` per protein. |
+| `--labels_dir` | Directory containing one `{target}.json` per protein with the annotated sites (format below). |
+| `--graph_dir` | Where the hierarchical graphs `{target}__{site}.pt` are written. |
+| `--task_dir` | Where the structures `PDBs/{target}__{site}.pdb` used for rendering are written. |
+| `--output_dir` | Where the predictions are written. |
+| `--k_folds`, `--seed` | Must match the trained checkpoints (use `--k_folds 5`). |
+| `--threshold` | Decision threshold (default 0.5). |
+| `--active_levels`, `--readout_level` | Same meaning as in training (defaults match the paper). |
+
+For each target and site, the script writes `{output_dir}/{target}__{site}.json` containing the task, the structure used, TP/TN/FP/FN counts, precision, recall, F1, MCC, and the per-residue classification. A combined `{output_dir}/_summary.json` is also written.
+
+## Running Your Own Protein
+
+The case-study script can also be used to run PRIME-ISP on a specific protein of your own. Prepare the inputs as described in [Case Studies](#case-studies), then:
+
+1. Place a cleaned PDB file (protein chains only) at `{pdb_dir}/{target}_clean.pdb`.
+2. Create `{labels_dir}/{target}.json` with the annotated sites, listing interacting residues per chain (numbering must follow the PDB file):
+
+```json
+   {
+     "my_site": {
+       "positions_by_chain": {"A": [45, 46, 49, 102, 103]},
+       "source": "PDB 1ABC, residues within 6.5 Å of the ligand"
+     }
+   }
+```
+
+3. Register the target in `CASE_STUDY_SITE_TASKS` in `run_case_study_inference.py`, mapping each site to the task whose model should be used (see [Supported benchmarks](#supported-benchmarks)):
+
+```python
+   CASE_STUDY_SITE_TASKS = {
+       ...
+       "my_protein": {"my_site": "SMPI-site"},
+   }
+```
+
+4. Run the commands above.
 
 ## Citation
 

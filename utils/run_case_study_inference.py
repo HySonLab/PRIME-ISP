@@ -9,40 +9,6 @@ own task, against that site's own label set. All sites of the same target
 share ONE input structure, so the model's ability to tell them apart from
 structure alone is exactly what's being tested.
 
-WHY THIS DOESN'T REUSE render_prime_predictions.py's labels_from_positions:
-that helper matches ground-truth positions to residues by residue NUMBER
-ONLY (via "chain:resnum".split(":")[1]), which is fine for the single-chain
-tasks it was written for, but WRONG here: thrombin's light (~1-36) and
-heavy (~1-259) chains, and HIV-1 RT's p66 (~600-1153) and p51 (~600-1027)
-chains, all share overlapping auth_seq_id ranges (RT's overlap almost
-entirely). This script's label matching therefore uses the full
-"chain:resnum" string, matching extract_case_study_labels.py's
-positions_by_chain output exactly.
-
-Pipeline per target:
-  1. Build ONE hierarchical graph from {target}_clean.pdb (surface export +
-     ESM-2 + all graph levels) -- built once per target and reused across
-     that target's sites, since it's the same input structure.
-  2. Per site: load (and cache) the checkpoint ensemble for that site's
-     task, build a chain-aware residue_labels tensor from the site's
-     positions_by_chain, run inference, compute TP/TN/FP/FN metrics at a
-     single threshold.
-  3. Save the graph (with that site's residue_labels baked in) to
-     --graph_dir/{target}__{site}.pt and copy the clean PDB to
-     --task_dir/PDBs/{target}__{site}.pdb, so your EXISTING
-     render_prime_predictions.py / visualize_binding_site.py can render it
-     completely unchanged via:
-         --record_id {target}__{site} --graph_dir <graph_dir> --task_dir <task_dir>
-  4. Save metrics + residue-level predictions as JSON under --output_dir.
-
-PLEASE VERIFY the CASE_STUDY_SITE_TASKS mapping below against your actual
-data_config.yaml task keys / checkpoint filenames before running -- I've
-mapped each site to the interaction-class task that matches it, but the
-exact task-name variant that maps to a checkpoint you've actually trained
-(e.g. PepPI has two: 'PepPI-site_Train640-Test639' vs.
-'PepPI-site_Train1154-Test125') is a call you should make, not one that
-should be guessed silently.
-
 Usage:
     python utils/run_case_study_inference.py \
         --pdb_dir ./Datasets/CaseStudies/clean_pdbs \
