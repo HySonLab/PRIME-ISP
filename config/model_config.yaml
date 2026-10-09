@@ -43,19 +43,6 @@ hierarchical:
   n_layers: 3
   dropout: 0.3
 
-  # =========================================
-  # WITH pretrained encoders (EGNN + EMNN)
-  # =========================================
-  # input_dims:
-  #   surface: 130    # EMNN output (128) + handcrafted (2)
-  #   atom: 128       # EGNN output
-  #   residue: 23     # one-hot + angles
-  #   sse: 4          # type one-hot (3) + length (1)
-  #   protein: 1280   # ESM-2 CLS token
-
-  # =========================================
-  # WITHOUT pretrained encoders (comment out above, uncomment below)
-  # =========================================
   input_dims:
       surface: 8
       atom: 17

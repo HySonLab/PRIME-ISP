@@ -184,6 +184,12 @@ The case-study script can also be used to run PRIME-ISP on a specific protein of
 
 4. Run the commands above.
 
+## SHREC 2022 Benchmark
+
+The atom- and surface-level pocket evaluation on SHREC 2022 uses the benchmark's official evaluation code, which expects its own input format and data processing. We therefore adapted PRIME-ISP's outputs to that format in a separate codebase, which is not part of this repository because it does not share the pipeline or configuration used for the residue-level benchmarks.
+
+The full procedure (atom-level prediction, projection onto surface vertices, and pocket clustering and ranking) is described in the manuscript and can be reproduced from that description. The code for this benchmark is also available on request: please contact dvnguye2@uab.edu.
+
 ## Citation
 
 If you use PRIME-ISP in your work, please cite:
