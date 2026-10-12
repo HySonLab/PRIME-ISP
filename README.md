@@ -159,30 +159,13 @@ For each target and site, the script writes `{output_dir}/{target}__{site}.json`
 
 ## Running Your Own Protein
 
-The case-study script can also be used to run PRIME-ISP on a specific protein of your own. Prepare the inputs as described in [Case Studies](#case-studies), then:
+`predict.sh` predicts interaction sites for a protein of your choice from either its sequence or its structure. Sequences are folded with ESMFold2. Edit the variables at the top of the script: set one of `SEQUENCE`, `FASTA`, or `STRUCTURE`, and list the interaction partner types to predict in `PARTNERS` (`protein`, `peptide`, `dna`, `rna`, `metal_ca`, `metal_fe`, `metal_mn`, `carbohydrate`, `small_molecule`, or `all`). No site annotations are needed.
 
-1. Place a cleaned PDB file (protein chains only) at `{pdb_dir}/{target}_clean.pdb`.
-2. Create `{labels_dir}/{target}.json` with the annotated sites, listing interacting residues per chain (numbering must follow the PDB file):
-
-```json
-   {
-     "my_site": {
-       "positions_by_chain": {"A": [45, 46, 49, 102, 103]},
-       "source": "PDB 1ABC, residues within 6.5 Å of the ligand"
-     }
-   }
+```bash
+bash predict.sh
 ```
 
-3. Register the target in `CASE_STUDY_SITE_TASKS` in `run_case_study_inference.py`, mapping each site to the task whose model should be used (see [Supported benchmarks](#supported-benchmarks)):
-
-```python
-   CASE_STUDY_SITE_TASKS = {
-       ...
-       "my_protein": {"my_site": "SMPI-site"},
-   }
-```
-
-4. Run the commands above.
+For each protein, `prime_isp_output/<name>/` contains a CSV with the per-residue probability and predicted site for every selected partner type, and one PDB file per partner type with the probability stored in the B-factor column for coloring in PyMOL or Mol*.
 
 ## SHREC 2022 Benchmark
 
