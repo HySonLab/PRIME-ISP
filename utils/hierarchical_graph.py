@@ -576,7 +576,7 @@ def get_surface_features(mesh, encoder=None, device="cuda", input_dim=16):
     e3_len = np.linalg.norm(v2 - v1, axis=1)
     avg_edge_len = (e1_len + e2_len + e3_len) / 3.0
     perimeter    = e1_len + e2_len + e3_len
-    aspect_ratio = 4 * np.sqrt(3) * face_areas / (perimeter ** 2 + 1e-8)
+    aspect_ratio = 12 * np.sqrt(3) * face_areas / (perimeter ** 2 + 1e-8)
 
     z_coord = centroids[:, 2]
 
