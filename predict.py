@@ -38,7 +38,7 @@ sys.path.insert(0, REPO_ROOT)
 # Edit here to choose a different benchmark model for a partner type.
 # ----------------------------------------------------------------------
 PARTNER_TASKS = {
-    "protein":        "PPI-site_Train9982-Test355",
+    "protein":        "PPI-site_Train335-Test60-Test315",
     "peptide":        "PepPI-site_Train1154-Test125",
     "dna":            "DPI-site",
     "rna":            "RPI-site",
@@ -96,7 +96,7 @@ def read_sequences(sequence=None, fasta=None):
 
 def fold_sequences(seqs, out_dir):
     """Fold sequences with ESMFold2 (same model/settings as folding.py)."""
-    from utils.folding import load_model, try_fold, free_gpu_memory
+    from folding import load_model, try_fold, free_gpu_memory
 
     os.makedirs(out_dir, exist_ok=True)
     paths = {}
@@ -258,6 +258,155 @@ def write_bfactor_pdb(pdb_path, out_path, residue_id, probs):
     io.save(out_path)
 
 
+def render_figure(pdb_path, residue_id, probs, out_path, title, threshold):
+    """PNG with (left) the C-alpha trace colored by predicted probability and
+    (right) the per-residue probability profile."""
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap
+    from Bio.PDB import PDBParser
+
+    cmap = LinearSegmentedColormap.from_list(
+        "prob", ["#1F5F5B", "#2C7873", "#4CA1A3", "#A9D6D2",
+                 "#E3F2F1", "#F1C6BE", "#E8837A"])
+
+    structure = PDBParser(QUIET=True).get_structure("q", pdb_path)
+    ca = {}
+    for res in structure[0].get_residues():
+        if "CA" in res:
+            ca[f"{res.get_parent().get_id()}:{res.get_id()[1]}"] = res["CA"].get_coord()
+
+    idx = [i for i, rid in enumerate(residue_id) if rid in ca]
+    xyz = np.array([ca[residue_id[i]] for i in idx])
+    p = np.asarray(probs, dtype=float)[idx]
+    chains = [residue_id[i].split(":")[0] for i in idx]
+
+    fig = plt.figure(figsize=(11, 4.4), dpi=300)
+
+    ax = fig.add_subplot(1, 2, 1, projection="3d")
+    start = 0
+    for end in range(1, len(chains) + 1):
+        if end == len(chains) or chains[end] != chains[start]:
+            seg = xyz[start:end]
+            ax.plot(seg[:, 0], seg[:, 1], seg[:, 2], color="#BFC7C7", lw=0.8, zorder=1)
+            start = end
+    order = np.argsort(p)  # draw high-probability residues last
+    sc = ax.scatter(xyz[order, 0], xyz[order, 1], xyz[order, 2], c=p[order],
+                    cmap=cmap, vmin=0, vmax=1, s=14 + 30 * (p[order] >= threshold),
+                    edgecolors="none", depthshade=False, zorder=2)
+    span = np.ptp(xyz, axis=0)
+    ax.set_box_aspect(span / span.max())
+    ax.set_axis_off()
+    ax.set_title(title, fontsize=11)
+    cbar = fig.colorbar(sc, ax=ax, shrink=0.6, pad=0.02)
+    cbar.set_label("Interaction probability", fontsize=9)
+
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.bar(np.arange(len(p)), p, width=1.0, color=cmap(p), linewidth=0)
+    ax2.axhline(threshold, color="#4A5757", ls="--", lw=0.9)
+    ax2.set_xlim(0, len(p))
+    ax2.set_ylim(0, 1)
+    ax2.set_xlabel("Residue index", fontsize=9)
+    ax2.set_ylabel("Interaction probability", fontsize=9)
+    for s in ("top", "right"):
+        ax2.spines[s].set_visible(False)
+
+    fig.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
+PROB_COLORS = ["#1F5F5B", "#2C7873", "#4CA1A3", "#A9D6D2",
+               "#E3F2F1", "#F1C6BE", "#E8837A"]  # low -> high probability
+
+
+def render_pymol(bfactor_pdb, out_prefix, views=("front", "back")):
+    """Surface rendering colored by predicted probability. Expects the PDB
+    written by write_bfactor_pdb (probability * 100 in the B-factor column).
+    Requires PyMOL: conda install -c conda-forge pymol-open-source"""
+    import pymol2
+
+    with pymol2.PyMOL() as p:
+        cmd = p.cmd
+        cmd.load(bfactor_pdb, "prot")
+        cmd.hide("everything")
+        cmd.show("surface")
+        cmd.bg_color("white")
+        cmd.set("ray_opaque_background", 1)
+        cmd.set("surface_quality", 1)
+        cmd.set("ray_trace_mode", 1)
+
+        names = []
+        for i, hex_color in enumerate(PROB_COLORS):
+            rgb = [int(hex_color[j:j + 2], 16) / 255.0 for j in (1, 3, 5)]
+            cmd.set_color(f"prob{i}", rgb)
+            names.append(f"prob{i}")
+        cmd.spectrum("b", " ".join(names), "prot", minimum=0, maximum=100)
+
+        cmd.orient()
+        cmd.zoom("all", buffer=4)
+        for view in views:
+            if view == "back":
+                cmd.turn("y", 180)
+            cmd.ray(1400, 1400)
+            cmd.png(f"{out_prefix}_{view}.png", dpi=300)
+
+
+PARTNER_LABELS = {
+    "protein": "Protein", "peptide": "Peptide", "dna": "DNA", "rna": "RNA",
+    "metal_ca": "Metal ion (Ca)", "metal_fe": "Metal ion (Fe)",
+    "metal_mn": "Metal ion (Mn)", "carbohydrate": "Carbohydrate",
+    "small_molecule": "Small molecule",
+}
+
+
+def combine_figure(panels, out_path, title, ncols=3):
+    """One figure with every partner's PyMOL rendering and a shared
+    probability color bar. panels = [(label, png_path), ...]."""
+    import math
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import LinearSegmentedColormap, Normalize
+
+    cmap = LinearSegmentedColormap.from_list("prob", PROB_COLORS)
+
+    def load_cropped(path, margin=12):
+        img = plt.imread(path)[..., :3]
+        mask = (img < 0.97).any(axis=-1)
+        if not mask.any():
+            return img
+        ys, xs = np.where(mask)
+        return img[max(ys.min() - margin, 0):ys.max() + margin,
+                   max(xs.min() - margin, 0):xs.max() + margin]
+
+    n = len(panels)
+    ncols = min(ncols, n)
+    nrows = math.ceil(n / ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4.2 * ncols, 4.0 * nrows + 1.0),
+                             dpi=300, squeeze=False)
+    for ax in axes.ravel():
+        ax.axis("off")
+    for ax, (label, path) in zip(axes.ravel(), panels):
+        ax.imshow(load_cropped(path))
+        ax.set_title(label, fontsize=12, fontweight="bold")
+    fig.suptitle(title, fontsize=13)
+    fig.tight_layout(rect=[0, 0.10, 1, 0.97])
+
+    cax = fig.add_axes([0.30, 0.045, 0.40, 0.022])
+    cb = fig.colorbar(ScalarMappable(norm=Normalize(0, 1), cmap=cmap),
+                      cax=cax, orientation="horizontal")
+    cb.set_ticks([0, 0.25, 0.5, 0.75, 1])
+    cb.ax.tick_params(labelsize=9)
+    cb.set_label("Predicted interaction probability", fontsize=10)
+    fig.savefig(out_path, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
 # ======================================================================
 # Main
 # ======================================================================
@@ -282,6 +431,11 @@ def main():
     ap.add_argument("--active_levels", nargs="+",
                     default=["surface", "atom", "residue", "sse", "protein"])
     ap.add_argument("--readout_level", type=str, default="residue")
+    ap.add_argument("--render", choices=["auto", "pymol", "matplotlib", "none"],
+                    default="auto",
+                    help="Figures: 'pymol' = surface colored by probability "
+                         "(needs PyMOL), 'matplotlib' = backbone + probability "
+                         "profile, 'auto' = pymol if installed, else matplotlib.")
     args = ap.parse_args()
 
     if sum(x is not None for x in (args.sequence, args.fasta, args.structure)) != 1:
@@ -343,13 +497,36 @@ def main():
         d = os.path.join(args.output_dir, name)
         write_csv(os.path.join(d, f"{name}_predictions.csv"),
                   graph.residue_id, residues, probs[name], args.threshold)
+        panels = []
         for partner, p in probs[name].items():
             write_bfactor_pdb(structures[name],
                               os.path.join(d, f"{name}_{partner}.pdb"),
                               graph.residue_id, p)
+            backend = args.render
+            if backend == "auto":
+                try:
+                    import pymol2  # noqa: F401
+                    backend = "pymol"
+                except ImportError:
+                    backend = "matplotlib"
+            if backend == "pymol":
+                views_dir = os.path.join(d, "views")
+                os.makedirs(views_dir, exist_ok=True)
+                prefix = os.path.join(views_dir, f"{name}_{partner}")
+                render_pymol(os.path.join(d, f"{name}_{partner}.pdb"), prefix,
+                             views=("front",))
+                panels.append((PARTNER_LABELS.get(partner, partner),
+                               f"{prefix}_front.png"))
+            elif backend == "matplotlib":
+                render_figure(structures[name], graph.residue_id, p,
+                              os.path.join(d, f"{name}_{partner}.png"),
+                              f"{name}: {partner}", args.threshold)
             n_sites = int((p >= args.threshold).sum())
             print(f"  {name} / {partner}: {n_sites} of {len(p)} residues "
                   f"predicted as interacting (p >= {args.threshold})")
+        if panels:
+            combine_figure(panels, os.path.join(d, f"{name}_summary.png"), name)
+            print(f"  summary figure: {os.path.join(d, f'{name}_summary.png')}")
         print(f"  results: {d}")
 
 

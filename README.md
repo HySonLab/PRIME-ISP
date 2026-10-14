@@ -165,7 +165,13 @@ For each target and site, the script writes `{output_dir}/{target}__{site}.json`
 bash predict.sh
 ```
 
-For each protein, `prime_isp_output/<name>/` contains a CSV with the per-residue probability and predicted site for every selected partner type, and one PDB file per partner type with the probability stored in the B-factor column for coloring in PyMOL or Mol*.
+For each protein, `prime_isp_output/<name>/` contains:
+
+- `<name>_predictions.csv`: the per-residue probability and predicted site for every selected partner type.
+- `<name>_summary.png`: one figure with the protein surface colored by predicted interaction probability for every selected partner type, with a shared color bar. The individual views are saved in `views/`.
+- `<name>_<partner>.pdb`: the structure with the probability stored in the B-factor column, for coloring in PyMOL or Mol*.
+
+The surface figures are rendered with PyMOL (`conda install -c conda-forge pymol-open-source`). If PyMOL is not installed, a simpler matplotlib figure of the backbone and the per-residue probability profile is saved for each partner type instead. Set `--render none` to skip figures.
 
 ## SHREC 2022 Benchmark
 
