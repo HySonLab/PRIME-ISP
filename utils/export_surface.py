@@ -1,5 +1,4 @@
 import argparse
-from pymol import cmd
 import os
 from glob import glob
 from tqdm import tqdm
@@ -154,8 +153,6 @@ def main():
             mesh.vertex_normals = None
             mesh.face_normals = None
             mesh.export(out_path)
-
-    cmd.quit()
 
 if __name__ == "__main__":
     main()

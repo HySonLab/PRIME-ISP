@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 
+plt.rcParams["hatch.linewidth"] = 4.0
+
 from make_full_results_figure import (
     TASKS,
     build_global_color_map,

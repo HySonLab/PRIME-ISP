@@ -186,6 +186,21 @@ The full procedure (atom-level prediction, projection onto surface vertices, and
 
 If you use PRIME-ISP in your work, please cite:
 
+```bibtex
+@article {Nguyen2026.10.18.759950,
+	author = {Nguyen, Viet Thanh Duy and Johnstone, John K. and Hy, Truong-Son},
+	title = {Towards a Unified Framework for Protein Interaction Site Prediction Using Hierarchical Protein Representations},
+	elocation-id = {2026.10.18.759950},
+	year = {2026},
+	doi = {10.64898/2026.10.18.759950},
+	publisher = {Cold Spring Harbor Laboratory},
+	abstract = {Proteins interact with a wide range of biomolecular partners, yet identifying the interaction sites that mediate these events remains a major challenge for understanding cellular function and guiding drug discovery. Existing computational methods are typically designed for specific interaction classes and often rely on task-specific features. Here, we introduce PRIME-ISP, a structure-based framework for predicting interaction sites across diverse biomolecular interaction types using a unified architecture. PRIME-ISP represents proteins at five organizational levels, including solvent-excluded surfaces, atoms, residues, secondary-structure elements, and whole proteins, and integrates information across these scales through coupled bottom-up and top-down propagation. This hierarchical representation jointly captures local geometry and global structural context, enabling a single architecture to address chemically and geometrically distinct binding problems without task-specific modifications. We evaluate PRIME-ISP on protein, peptide, DNA, RNA, small-molecule, metal, and carbohydrate interaction-site prediction benchmarks. Across these tasks, PRIME-ISP consistently outperforms a recent unified sequence-based predictor and achieves performance comparable to specialized methods while requiring no interaction-specific features. These results demonstrate that hierarchical structural representations provide a flexible foundation for interaction-site prediction across diverse biomolecular interactions. Source code and data are publicly available at https://github.com/HySonLab/PRIME-ISPCompeting Interest StatementThe authors have declared no competing interest.},
+	URL = {https://www.biorxiv.org/content/early/2026/10/22/2026.10.18.759950},
+	eprint = {https://www.biorxiv.org/content/early/2026/10/22/2026.10.18.759950.full.pdf},
+	journal = {bioRxiv}
+}
+```
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

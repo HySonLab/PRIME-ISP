@@ -131,6 +131,8 @@ TASKS = {
     },
     "MPI-Ca (Metal)": {
         "methods": {
+            "ESMBind":         [0.469, 0.502, 0.714, 0.343, 0.914],
+            "GraphBind":       [0.448, 0.445, 0.484, 0.418, 0.913],
             "MetalBind":       [0.506, 0.527, 0.720, 0.390, 0.952],
             "PRIME-ISP":       [0.671, 0.670, 0.718, 0.629, 0.950],
         },
@@ -139,6 +141,8 @@ TASKS = {
     },
     "MPI-Fe (Metal)": {
         "methods": {
+            "ESMBind":         [0.640, 0.643, 0.654, 0.571, 0.969],
+            "GraphBind":       [0.651, 0.651, 0.597, 0.716, 0.962],
             "MetalBind":       [0.676, 0.674, 0.674, 0.679, 0.981],
             "PRIME-ISP":       [0.678, 0.680, 0.611, 0.763, 0.963],
         },
@@ -147,6 +151,8 @@ TASKS = {
     },
     "MPI-Mn (Metal)": {
         "methods": {
+            "ESMBind":         [0.528, 0.527, 0.566, 0.496, 0.936],
+            "GraphBind":       [0.519, 0.518, 0.563, 0.441, 0.947],
             "MetalBind":       [0.518, 0.552, 0.615, 0.447, 0.953],
             "PRIME-ISP":       [0.559, 0.558, 0.604, 0.521, 0.948],
         },
@@ -266,7 +272,7 @@ def draw_bar_panel(ax, methods_dict, title, fontsize_scale=1.0):
     for i, name in enumerate(method_names):
         offset = (i - (n_methods - 1) / 2) * width
         color = GLOBAL_COLOR_MAP[name]
-        hatch = "//" if is_multi_task(name) else None
+        hatch = "/" if is_multi_task(name) else None
 
         plot_x, plot_v = [], []
         for xi, j in zip(x, keep_idx):
