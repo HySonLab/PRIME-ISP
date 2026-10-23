@@ -1,5 +1,8 @@
 # Towards a Unified Framework for Protein Interaction Site Prediction Using Hierarchical Protein Representations
 
+# Towards a Unified Framework for Protein Interaction Site Prediction Using Hierarchical Protein Representations
+
+[![bioRxiv](https://img.shields.io/badge/bioRxiv-preprint-b31b1b.svg)](https://doi.org/10.64898/2026.10.18.759950)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 PRIME-ISP is a structure-based interaction-site predictor that represents each protein as a five-level hierarchical graph (surface, atom, residue, secondary structure, protein) and passes messages both bottom-up and top-down across levels. The same architecture, input features, and training procedure are applied to every interaction class: protein, peptide, nucleic acid (DNA and RNA), small molecule, metal ion, and carbohydrate. A separate model instance is trained for each class (weights are not shared across classes).
