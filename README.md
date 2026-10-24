@@ -1,7 +1,5 @@
 # Towards a Unified Framework for Protein Interaction Site Prediction Using Hierarchical Protein Representations
 
-# Towards a Unified Framework for Protein Interaction Site Prediction Using Hierarchical Protein Representations
-
 [![bioRxiv](https://img.shields.io/badge/bioRxiv-preprint-b31b1b.svg)](https://doi.org/10.64898/2026.10.18.759950)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
