@@ -565,18 +565,18 @@ def get_surface_features(mesh, encoder=None, device="cuda", input_dim=16):
     except Exception:
         face_gauss_curv = np.zeros(len(faces))
 
-    # concavity
+    # radial_orientation 
     outward_dir = centroids - protein_center
     outward_dir = outward_dir / (np.linalg.norm(outward_dir, axis=1, keepdims=True) + 1e-8)
-    concavity   = -np.sum(face_normals * outward_dir, axis=1)
+    radial_orientation   = -np.sum(face_normals * outward_dir, axis=1)
 
-    # edge stats
+    # triangle_regularity
     e1_len = np.linalg.norm(edge1, axis=1)
     e2_len = np.linalg.norm(edge2, axis=1)
     e3_len = np.linalg.norm(v2 - v1, axis=1)
     avg_edge_len = (e1_len + e2_len + e3_len) / 3.0
     perimeter    = e1_len + e2_len + e3_len
-    aspect_ratio = 12 * np.sqrt(3) * face_areas / (perimeter ** 2 + 1e-8)
+    triangle_regularity = 12 * np.sqrt(3) * face_areas / (perimeter ** 2 + 1e-8)
 
     z_coord = centroids[:, 2]
 
@@ -585,9 +585,9 @@ def get_surface_features(mesh, encoder=None, device="cuda", input_dim=16):
         dist_to_center,
         face_mean_curv,
         face_gauss_curv,
-        concavity,
+        radial_orientation,
         avg_edge_len,
-        aspect_ratio,
+        triangle_regularity,
         z_coord,
     ], axis=1)
 
